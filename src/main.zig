@@ -1,5 +1,4 @@
 const std = @import("std");
-const uuid = @import("uuid.zig");
 const ipc = @import("ipc.zig");
 
 pub fn main() !void {

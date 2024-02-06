@@ -1,9 +1,6 @@
 const std = @import("std");
 const uuid = @import("uuid.zig");
 
-const u32_size = @sizeOf(u32);
-const u32x2 = u32_size * 2;
-
 extern fn GetCurrentProcessId() std.os.windows.DWORD;
 
 const ipc_list = blk: {
@@ -81,17 +78,13 @@ pub const Client = struct {
 
     fn send_handshake(self: *Self) !void {
         const body = try std.fmt.allocPrint(self.allocator,
-            \\{{
-            \\    "v": 1,
-            \\    "client_id": "{s}"
-            \\}}
+            \\{{"v":1,"client_id":"{s}"}}
         , .{self.client_id});
-        std.debug.print("Login: {s}\n", .{body});
+        std.debug.print("Piped: {s}\n", .{body});
         defer self.allocator.free(body);
 
         _ = try self.write(body, 0);
         const temp = try self.read();
-        std.debug.print("OP: {d}\n", .{temp.op});
         temp.data.deinit();
     }
 
