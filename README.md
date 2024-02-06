@@ -13,7 +13,7 @@ Windows Discord Rich Presence Client
 > 3. Games performance issues (stutter, slow launch) (ToF still won't launch)
 > 4. Streaming on Discord is not properly support on wayland. There are some client like Vesktop but is **NOT** watchable with like 5 fps
 >
-> And I had to switch to Windows every friggin evening to just play ToF and when I'm done, I need to restart and go back to Linux.
+> And I had to switch to Windows every friggin evening just to play ToF and when I'm done, I need to restart and go back to Linux.
 >
 > ***IT'S NOT FUN***
 
