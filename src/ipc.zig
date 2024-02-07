@@ -85,6 +85,7 @@ pub const Client = struct {
 
         // if `write` did not fail, socket is not null
         self.socket.?.close();
+        self.socket = null;
     }
 
     fn connect_ipc(self: *Self) !void {
