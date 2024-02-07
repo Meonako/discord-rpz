@@ -47,26 +47,28 @@ pub const Client = struct {
     allocator: std.mem.Allocator,
     client_id: []const u8,
     connected: bool = false,
-    socket: std.fs.File = undefined,
+    socket: ?std.fs.File = null,
 
     const Self = @This();
 
     fn write(self: *Self, data: []const u8, opcode: u8) !void {
         // std.debug.print("Sending: {s}\n", .{data});
+        const socket = self.socket orelse return error.Uninitialized;
         const header = buildHeader(opcode, @intCast(data.len));
 
-        _ = try self.socket.write(&header);
-        _ = try self.socket.write(data);
+        _ = try socket.write(&header);
+        _ = try socket.write(data);
     }
 
     fn read(self: *Self) !struct { op: u32, data: []const u8 } {
+        const socket = self.socket orelse return error.Uninitialized;
         var buffer: [8]u8 = undefined;
-        _ = try self.socket.read(&buffer);
+        _ = try socket.read(&buffer);
 
         const result = decodeHeader(buffer);
 
         const data = try self.allocator.alloc(u8, result.data_len);
-        _ = try self.socket.read(data);
+        _ = try socket.read(data);
 
         // std.debug.print(
         //     \\------------------------------------
@@ -81,14 +83,15 @@ pub const Client = struct {
     pub fn close(self: *Self) !void {
         try self.write("{}", 2);
 
-        self.socket.close();
+        // if `write` did not fail, socket is not null
+        self.socket.?.close();
     }
 
     fn connect_ipc(self: *Self) !void {
         for (ipc_list) |ipc| {
             const handle = std.fs.openFileAbsolute(ipc, .{ .mode = .read_write }) catch continue;
             self.socket = handle;
-            std.debug.print("Connected to: {s}\n", .{ipc});
+            // std.debug.print("Connected to: {s}\n", .{ipc});
             return;
         }
 
@@ -99,7 +102,7 @@ pub const Client = struct {
         const body = try std.fmt.allocPrint(self.allocator,
             \\{{"v":1,"client_id":"{s}"}}
         , .{self.client_id});
-        std.debug.print("Piped: {s}\n", .{body});
+        // std.debug.print("Piped: {s}\n", .{body});
         defer self.allocator.free(body);
 
         _ = try self.write(body, 0);
