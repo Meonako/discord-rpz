@@ -13,25 +13,35 @@ const ipc_list = blk: {
     break :blk list;
 };
 
-pub const Activity = struct { state: ?[]const u8 = null, details: ?[]const u8 = null, timestamps: ?struct {
+pub const Timestamp = struct {
     start: ?i64 = null,
     end: ?i64 = null,
-} = null, party: ?struct {
+};
+
+pub const Party = struct {
     id: ?[]const u8 = null,
     size: ?[2]i32 = null,
-} = null, assets: ?struct {
+};
+
+pub const Assets = struct {
     large_image: ?[]const u8 = null,
     large_text: ?[]const u8 = null,
     small_image: ?[]const u8 = null,
     small_text: ?[]const u8 = null,
-} = null, secrets: ?struct {
+};
+
+pub const Secrets = struct {
     join: ?[]const u8 = null,
     spectate: ?[]const u8 = null,
     match: ?[]const u8 = null,
-} = null, buttons: ?[]struct {
+};
+
+pub const Button = struct {
     label: []const u8,
     url: []const u8,
-} = null };
+};
+
+pub const Activity = struct { details: ?[]const u8 = null, state: ?[]const u8 = null, timestamps: ?Timestamp = null, party: ?Party = null, assets: ?Assets = null, secrets: ?Secrets = null, buttons: ?[]Button = null };
 
 pub const Client = struct {
     allocator: std.mem.Allocator,
@@ -41,35 +51,45 @@ pub const Client = struct {
 
     const Self = @This();
 
-    fn write(self: *Self, data: []u8, opcode: u8) !void {
-        const header = pack(opcode, @intCast(data.len));
+    fn write(self: *Self, data: []const u8, opcode: u8) !void {
+        // std.debug.print("Sending: {s}\n", .{data});
+        const header = buildHeader(opcode, @intCast(data.len));
 
         _ = try self.socket.write(&header);
         _ = try self.socket.write(data);
     }
 
-    fn read(self: *Self) !struct { op: u32, data: std.json.Parsed(std.json.Value) } {
+    fn read(self: *Self) !struct { op: u32, data: []const u8 } {
         var buffer: [8]u8 = undefined;
         _ = try self.socket.read(&buffer);
 
-        const result = unpack(buffer);
+        const result = decodeHeader(buffer);
 
         const data = try self.allocator.alloc(u8, result.data_len);
         defer self.allocator.free(data);
         _ = try self.socket.read(data);
 
-        std.debug.print("{s}\n", .{data});
+        std.debug.print(
+            \\------------------------------------
+            \\{s}
+            \\------------------------------------
+            \\
+        , .{data});
 
-        const parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, data, .{});
+        return .{ .op = result.opcode, .data = data };
+    }
 
-        return .{ .op = result.opcode, .data = parsed };
+    pub fn close(self: *Self) !void {
+        try self.write("{}", 2);
+
+        self.socket.close();
     }
 
     fn connect_ipc(self: *Self) !void {
-        for (ipc_list) |l| {
-            const handle = std.fs.openFileAbsolute(l, .{ .mode = .read_write }) catch continue;
+        for (ipc_list) |ipc| {
+            const handle = std.fs.openFileAbsolute(ipc, .{ .mode = .read_write }) catch continue;
             self.socket = handle;
-            std.debug.print("Connected to: {s}\n", .{l});
+            std.debug.print("Connected to: {s}\n", .{ipc});
             return;
         }
 
@@ -85,7 +105,13 @@ pub const Client = struct {
 
         _ = try self.write(body, 0);
         const temp = try self.read();
-        temp.data.deinit();
+        self.allocator.free(temp.data);
+    }
+
+    fn reconnect(self: *Self) !void {
+        try self.close();
+        try self.connect_ipc();
+        try self.send_handshake();
     }
 
     pub fn init(allocator: std.mem.Allocator, client_id: []const u8) !Self {
@@ -95,12 +121,14 @@ pub const Client = struct {
         return client;
     }
 
-    pub fn setActivity(self: *Self, activity: Activity) !void {
+    /// Return Discord response in `JSON` format.
+    /// > **Caller owns the returned memory and needs to free with init allocator**
+    pub fn setActivity(self: *Self, activity: Activity) ![]const u8 {
         const act = try std.json.stringifyAlloc(self.allocator, activity, .{ .emit_null_optional_fields = false });
         defer self.allocator.free(act);
 
         const body = try std.fmt.allocPrint(self.allocator,
-            \\{{"cmd":"SET_ACTIVITY","args": {{"pid":{d},"activity":{s}}},"nonce":"{s}"}}
+            \\{{"cmd":"SET_ACTIVITY","args":{{"pid":{d},"activity":{s}}},"nonce":"{s}"}}
         , .{
             GetCurrentProcessId(),
             act,
@@ -108,16 +136,27 @@ pub const Client = struct {
         });
         defer self.allocator.free(body);
 
-        std.debug.print("Sending: {s}\n", .{body});
-
         try self.write(body, 1);
 
         const temp = try self.read();
-        temp.data.deinit();
+        return temp.data;
+    }
+
+    /// Return Discord response in `JSON` format.
+    /// > **Caller owns the returned memory and needs to free with init allocator**
+    pub fn clearActivity(self: *Self) ![]const u8 {
+        const body = try std.fmt.allocPrint(self.allocator,
+            \\{{"cmd":"SET_ACTIVITY","args":{{"pid":{d}}},"nonce":"{s}"}}
+        , .{ GetCurrentProcessId(), try uuid.uuidV4() });
+        defer self.allocator.free(body);
+
+        try self.write(body, 1);
+        const temp = try self.read();
+        return temp.data;
     }
 };
 
-fn pack(opcode: u32, data_len: u32) [8]u8 {
+fn buildHeader(opcode: u32, data_len: u32) [8]u8 {
     var op_buf: [4]u8 = undefined;
     var data_len_buf: [4]u8 = undefined;
 
@@ -127,7 +166,7 @@ fn pack(opcode: u32, data_len: u32) [8]u8 {
     return op_buf ++ data_len_buf;
 }
 
-fn unpack(data: [8]u8) struct { opcode: u32, data_len: u32 } {
+fn decodeHeader(data: [8]u8) struct { opcode: u32, data_len: u32 } {
     const op_buf = data[0..4];
     const data_len_buf = data[4..8];
 
