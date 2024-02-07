@@ -66,15 +66,14 @@ pub const Client = struct {
         const result = decodeHeader(buffer);
 
         const data = try self.allocator.alloc(u8, result.data_len);
-        defer self.allocator.free(data);
         _ = try self.socket.read(data);
 
-        std.debug.print(
-            \\------------------------------------
-            \\{s}
-            \\------------------------------------
-            \\
-        , .{data});
+        // std.debug.print(
+        //     \\------------------------------------
+        //     \\{s}
+        //     \\------------------------------------
+        //     \\
+        // , .{data});
 
         return .{ .op = result.opcode, .data = data };
     }

@@ -12,10 +12,11 @@ pub fn main() !void {
 
     var client = try ipc.Client.init(allocator, "1002530808470446141");
 
-    try client.setActivity(.{ .details = "Discord Rich Presence", .state = "Written in ZIG!", .assets = .{
+    var response = try client.setActivity(.{ .details = "Discord Rich Presence", .state = "Written in ZIG!", .assets = .{
         .large_image = "https://raw.githubusercontent.com/github/explore/b28ef5e65d2d582ab36c30e3e2068721e71625e4/topics/zig/zig.png",
         .large_text = "Zig Programming Language",
     } });
+    allocator.free(response);
 
     _ = stdout.writeAll("First Presense set\n") catch {};
 
@@ -23,7 +24,8 @@ pub fn main() !void {
     // Pause
     _ = stdin.readUntilDelimiterOrEof(&buffer, '\n') catch {};
 
-    try client.clearActivity();
+    const temp = try client.clearActivity();
+    allocator.free(temp);
     _ = stdout.writeAll("First Presense cleared\n") catch {};
 
     // Pause
@@ -31,10 +33,11 @@ pub fn main() !void {
 
     var buttons = [1]ipc.Button{.{ .label = "Website", .url = "https://ziglang.org" }};
 
-    try client.setActivity(.{ .details = "Discord Zich Presence", .state = "Try Zig out below!", .assets = .{
+    response = try client.setActivity(.{ .details = "Discord Zich Presence", .state = "Try Zig out below!", .assets = .{
         .large_image = "https://raw.githubusercontent.com/github/explore/b28ef5e65d2d582ab36c30e3e2068721e71625e4/topics/zig/zig.png",
         .large_text = "Zig Programming Language",
     }, .buttons = &buttons });
+    allocator.free(response);
 
     _ = stdout.writeAll("Second Presense set\n") catch {};
 
