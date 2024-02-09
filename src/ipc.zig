@@ -46,7 +46,6 @@ pub const Activity = struct { details: ?[]const u8 = null, state: ?[]const u8 = 
 pub const Client = struct {
     allocator: std.mem.Allocator,
     client_id: []const u8,
-    connected: bool = false,
     socket: ?std.fs.File = null,
 
     const Self = @This();
