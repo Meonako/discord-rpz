@@ -144,6 +144,16 @@ pub const Client = struct {
         return temp.data;
     }
 
+    /// Quick and dirty way to set activity
+    ///
+    /// Lose ability to debug with discord's response
+    pub fn initAndSetActivity(allocator: std.mem.Allocator, client_id: []const u8, activity: Activity) !Client {
+        var client = try Client.init(allocator, client_id);
+        const temp = try client.setActivity(activity);
+        allocator.free(temp);
+        return client;
+    }
+
     /// Return Discord response in `JSON` format.
     /// > **Caller owns the returned memory and needs to free with init allocator**
     pub fn clearActivity(self: *Self) ![]const u8 {
