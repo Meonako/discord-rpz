@@ -99,7 +99,7 @@ pub const Client = struct {
         return error.IPCNotFound;
     }
 
-    fn send_handshake(self: *Self) !void {
+    fn sendHandshake(self: *Self) !void {
         const body = try std.fmt.allocPrint(self.allocator,
             \\{{"v":1,"client_id":"{s}"}}
         , .{self.client_id});
@@ -114,13 +114,13 @@ pub const Client = struct {
     fn reconnect(self: *Self) !void {
         try self.close();
         try self.connect_ipc();
-        try self.send_handshake();
+        try self.sendHandshake();
     }
 
     pub fn init(allocator: std.mem.Allocator, client_id: []const u8) !Self {
         var client = Self{ .allocator = allocator, .client_id = client_id };
         try client.connect_ipc();
-        try client.send_handshake();
+        try client.sendHandshake();
         return client;
     }
 
