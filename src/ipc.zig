@@ -87,7 +87,7 @@ pub const Client = struct {
         self.socket = null;
     }
 
-    fn connect_ipc(self: *Self) !void {
+    fn connectIpc(self: *Self) !void {
         for (ipc_list) |ipc| {
             const handle = std.fs.openFileAbsolute(ipc, .{ .mode = .read_write }) catch continue;
             self.socket = handle;
@@ -112,13 +112,13 @@ pub const Client = struct {
 
     fn reconnect(self: *Self) !void {
         try self.close();
-        try self.connect_ipc();
+        try self.connectIpc();
         try self.sendHandshake();
     }
 
     pub fn init(allocator: std.mem.Allocator, client_id: []const u8) !Self {
         var client = Self{ .allocator = allocator, .client_id = client_id };
-        try client.connect_ipc();
+        try client.connectIpc();
         try client.sendHandshake();
         return client;
     }
